@@ -80,7 +80,10 @@ static DWORD WINAPI thread_pool_work_loop(LPVOID args) {
 
         /* 2. waits for condition variable. */
         while (pool->taskQueueHead == NULL && pool->running) {
-            SleepConditionVariableCS(&(pool->taskQueueConditionVariable), &(pool->taskQueueMutex), INFINITE);
+            if (!SleepConditionVariableCS(&(pool->taskQueueConditionVariable), &(pool->taskQueueMutex), INFINITE)) {
+                print_last_system_error("SleepConditionVariableCS() failed");
+                LeaveCriticalSection(&(pool->taskQueueMutex));
+            }
         }
 
         if (pool->taskQueueHead == NULL && !pool->running) {
@@ -158,7 +161,7 @@ static void thread_pool_join_all(struct ThreadPool* pool) {
     WakeAllConditionVariable(&(pool->taskQueueConditionVariable));
 
     /* let all the threads running until completed. */
-    WaitForMultipleObjects(pool->threadNum, pool->threads, 1, INFINITE);
+    (void)WaitForMultipleObjects(pool->threadNum, pool->threads, 1, INFINITE);
 }
 
 /*
